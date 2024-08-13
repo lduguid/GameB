@@ -177,7 +177,7 @@ static DWORD CreateMainGameWindow(void)
   
   WindowClass.lpszClassName = GAME_NAME"_WINDOWCLASS";
 
-  // SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);  // NOTE in manifest.
+  // SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);  // NOTE in embedded manifest.
   
   if (!RegisterClassA(&WindowClass))
   {

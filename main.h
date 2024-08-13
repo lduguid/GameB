@@ -16,7 +16,7 @@ typedef struct GAMEBITMAP
 {
   BITMAPINFO BitmapInfo;
   
-  uint32_t pad;  // padding
+  uint32_t pad;  // NOTE: explicit 4-bytes padding or else compiler does it which generates a warning
 
   void* Memory;
 } GAMEBITMAP;
