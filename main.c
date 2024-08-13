@@ -24,11 +24,7 @@ BOOL gGameIsRunning;
 
 GAMEBITMAP gBackBuffer;
 
-MONITORINFO gMonitorInfo = { sizeof(MONITORINFO) };
-
-int32_t gMonitorWidth;
-
-int32_t gMonitorHeight;
+GAMEPERFDATA gPerformanceData;
 
 
 int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In_ LPSTR CmdLine, _In_ int CmdShow)
@@ -55,7 +51,9 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
     goto Exit;
   }
 
+  QueryPerformanceFrequency(&gPerformanceData.PerfFrequency);
 
+  
   gBackBuffer.BitmapInfo.bmiHeader.biSize = sizeof(gBackBuffer);
 
   gBackBuffer.BitmapInfo.bmiHeader.biWidth = GAME_RES_WIDTH;
@@ -85,6 +83,9 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
 
   while (TRUE == gGameIsRunning)
   {
+
+    QueryPerformanceCounter(&gPerformanceData.FrameStart);
+
     while (PeekMessageA(&Message, gGameWindow, 0, 0, PM_REMOVE))
     {
       DispatchMessageA(&Message);
@@ -94,7 +95,26 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
 
     RenderFrameGraphics();
 
+    QueryPerformanceCounter(&gPerformanceData.FrameEnd);
+
+    gPerformanceData.ElapsedMicroSecondsPerFrame.QuadPart = gPerformanceData.FrameEnd.QuadPart - gPerformanceData.FrameStart.QuadPart;
+
+    gPerformanceData.ElapsedMicroSecondsPerFrame.QuadPart *= 1000000;
+
+    gPerformanceData.ElapsedMicroSecondsPerFrame.QuadPart /= gPerformanceData.PerfFrequency.QuadPart;
+
     Sleep(1);  // TODO do i need this?
+
+    gPerformanceData.TotalFramesRendered++;
+
+    if (gPerformanceData.TotalFramesRendered % CALCULATE_AVG_FPS_EVERY_X_FRAMES == 0)
+    {
+      char str[64] = { 0 };
+
+      _snprintf_s(str, _countof(str), _TRUNCATE, "Elapsed microseconds: %lli\n", gPerformanceData.ElapsedMicroSecondsPerFrame.QuadPart);
+      
+      OutputDebugStringA(str);
+    }
   }
 
 Exit: 
@@ -194,16 +214,18 @@ static DWORD CreateMainGameWindow(void)
     goto Exit;
   }
 
-  if (!GetMonitorInfoA(MonitorFromWindow(gGameWindow, MONITOR_DEFAULTTOPRIMARY), &gMonitorInfo))
+  gPerformanceData.MonitorInfo.cbSize = sizeof(MONITORINFO);
+
+  if (!GetMonitorInfoA(MonitorFromWindow(gGameWindow, MONITOR_DEFAULTTOPRIMARY), &gPerformanceData.MonitorInfo))
   {
     Result = ERROR_MONITOR_NO_DESCRIPTOR;
     
     goto Exit;
   }
 
-  gMonitorWidth = gMonitorInfo.rcMonitor.right - gMonitorInfo.rcMonitor.left;
+  gPerformanceData.MonitorWidth = gPerformanceData.MonitorInfo.rcMonitor.right - gPerformanceData.MonitorInfo.rcMonitor.left;
 
-  gMonitorHeight = gMonitorInfo.rcMonitor.bottom - gMonitorInfo.rcMonitor.top;
+  gPerformanceData.MonitorHeight = gPerformanceData.MonitorInfo.rcMonitor.bottom - gPerformanceData.MonitorInfo.rcMonitor.top;
 
   if (!SetWindowLongPtrA(gGameWindow, GWL_STYLE, (WS_OVERLAPPEDWINDOW | WS_VISIBLE) & ~WS_OVERLAPPEDWINDOW))
   {
@@ -213,8 +235,8 @@ static DWORD CreateMainGameWindow(void)
   }
 
   if (!SetWindowPos(gGameWindow, HWND_TOP /*HWND_TOPMOST*/,
-    gMonitorInfo.rcMonitor.left, gMonitorInfo.rcMonitor.top, 
-    gMonitorWidth, gMonitorHeight, SWP_FRAMECHANGED))
+    gPerformanceData.MonitorInfo.rcMonitor.left, gPerformanceData.MonitorInfo.rcMonitor.top,
+    gPerformanceData.MonitorWidth, gPerformanceData.MonitorHeight, SWP_FRAMECHANGED))
   {
     Result = GetLastError();
 
@@ -272,6 +294,9 @@ static void RenderFrameGraphics(void)
   {
     Pixel.Blue = 0xff;
 
+    // NOTE: No compiler warning about memcpy_s Vs. memcpy. general consensus is that
+    // memcpy_s no safer then memcpy.
+
     memcpy((PIXEL32*)(gBackBuffer.Memory) + i, &Pixel, sizeof(PIXEL32));
     
     Pixel.Blue = 0xef;
@@ -298,7 +323,7 @@ static void RenderFrameGraphics(void)
   HDC DeviceContext = GetDC(gGameWindow);
 
   StretchDIBits(DeviceContext, 
-    0, 0, gMonitorWidth, gMonitorHeight, 
+    0, 0, gPerformanceData.MonitorWidth, gPerformanceData.MonitorHeight,
     0, 0, GAME_RES_WIDTH, GAME_RES_HEIGHT, 
     gBackBuffer.Memory, &gBackBuffer.BitmapInfo, 
     DIB_RGB_COLORS, SRCCOPY);
