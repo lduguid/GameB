@@ -3,25 +3,21 @@
 #endif
 
 #include <stdio.h>
-
 #include <stdlib.h>
+#include <stdint.h>
+#include <time.h>
 
 //#define WIN32_LEAN_AND_MEAN 
 //#pragma warning(push, 3)
 //#include <windows.h>
 //#pragma warning(pop)
 
-#include <stdint.h>
-
 #include "main.h"
-
-#include <time.h>
 
 
 // TODO, do we need all these globals here?
 
 _NtQueryTimerResolution NtQueryTimerResolution = NULL;
-
 
 HWND gGameWindow;
 
@@ -85,9 +81,20 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
   // VS2022 seems to require a strip of type (FARPROC) with a cast to (void*) first, then desired function type, 
   // in this case (_NtQueryTimerResolution)
   
-  if ((NtQueryTimerResolution = (_NtQueryTimerResolution)(void*) GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQueryTimerResolution")) == NULL)
+  HMODULE NtDLLModule = GetModuleHandleA("ntdll.dll");
+
+  if (NtDLLModule != 0)
   {
-    MessageBoxA(NULL, "Couldn't find the NtQueryTimerResolution function in ntdll.dll!", "Error!", MB_ICONERROR | MB_OK);
+    if ((NtQueryTimerResolution = (_NtQueryTimerResolution)(void*)GetProcAddress(NtDLLModule, "NtQueryTimerResolution")) == NULL)
+    {
+      MessageBoxA(NULL, "Couldn't find the NtQueryTimerResolution function in ntdll.dll!", "Error!", MB_ICONERROR | MB_OK);
+
+      goto Exit;
+    }
+  }
+  else
+  {
+    MessageBoxA(NULL, "Couldn't retrieves a module handle for ntdll.dll!", "Error!", MB_ICONERROR | MB_OK);
 
     goto Exit;
   }
