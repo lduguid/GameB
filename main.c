@@ -260,7 +260,6 @@ LRESULT CALLBACK MainWindowProc(HWND WindowHandle, UINT Message, WPARAM WParam, 
 
   switch (Message)
   {
-
     case WM_CLOSE:
       gGameIsRunning = FALSE;
 
@@ -274,13 +273,11 @@ LRESULT CALLBACK MainWindowProc(HWND WindowHandle, UINT Message, WPARAM WParam, 
       break;
 
     case WM_DESTROY:
-    
       PostQuitMessage(0);
 
       break;
 
     default:
-
       Result = DefWindowProcA(WindowHandle, Message, WParam, LParam);
   }
 
@@ -338,8 +335,9 @@ static DWORD CreateMainGameWindow(void)
     goto Exit;
   }
 
-  if (!(gGameWindow = CreateWindowA(WindowClass.lpszClassName, GAME_NAME, WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-    CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, (HWND)NULL, (HMENU)NULL, GetModuleHandleA(NULL) /*Instance*/, (LPVOID)NULL))) 
+  if (!(gGameWindow = CreateWindowA(WindowClass.lpszClassName, GAME_NAME, 
+    WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 
+    (HWND)NULL, (HMENU)NULL, GetModuleHandleA(NULL), (LPVOID)NULL))) 
   {
     Result = DisplayErrorWithCode("Main Window Creation has failed");
     
@@ -417,10 +415,10 @@ static void ProcessPlayerInput(void)
 }
 
 #pragma warning(push)
-#pragma warning( disable : 5045)  // QSpectre crap.
+#pragma warning( disable : 5045)        // QSpectre crap.
 static void RenderFrameGraphics(void)
 {
-  //memset(gBackBuffer.Memory, 0xff, GAME_RES_WIDTH);  // 1 pixel bottom left corner.
+  // Draw Pretty Background
 
   PIXEL32 Pixel = { 0 };
 
@@ -432,34 +430,54 @@ static void RenderFrameGraphics(void)
   
   Pixel.Alpha = 0xff;
 
-  for (int i = 0; i < GAME_RES_WIDTH * 5; i++)
+  for (int step = 0; step < 48; step += 6)
   {
-    Pixel.Blue = 0xff;
+    for (int i = 0; i < (GAME_RES_WIDTH * 5); i++)
+    {
+      Pixel.Blue = 0xff;
 
-    // NOTE: No compiler warning about memcpy_s Vs. memcpy. general consensus is that
-    // memcpy_s no safer then memcpy.
+      // NOTE: No compiler warning about memcpy_s Vs. memcpy. general consensus is that
+      // memcpy_s no safer then memcpy.
 
-    memcpy((PIXEL32*)(gBackBuffer.Memory) + i, &Pixel, sizeof(PIXEL32));
-    
-    Pixel.Blue = 0xef;
-    
-    memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * 1) + i, &Pixel, sizeof(PIXEL32));
-    
-    Pixel.Blue = 0xdf;
-    
-    memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * 2) + i, &Pixel, sizeof(PIXEL32));
-    
-    Pixel.Blue = 0xcf;
-    
-    memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * 3) + i, &Pixel, sizeof(PIXEL32));
-    
-    Pixel.Blue = 0xbf;
-    
-    memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * 4) + i, &Pixel, sizeof(PIXEL32));
-    
-    Pixel.Blue = 0xaf;
-    
-    memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * 5) + i, &Pixel, sizeof(PIXEL32));
+      memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * step) + i , &Pixel, sizeof(PIXEL32));
+
+      Pixel.Blue = 0xef;
+
+      memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * (1 + step)) + i, &Pixel, sizeof(PIXEL32));
+
+      Pixel.Blue = 0xdf;
+
+      memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * (2 + step)) + i, &Pixel, sizeof(PIXEL32));
+
+      Pixel.Blue = 0xcf;
+
+      memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * (3 + step)) + i, &Pixel, sizeof(PIXEL32));
+
+      Pixel.Blue = 0xbf;
+
+      memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * (4 + step)) + i, &Pixel, sizeof(PIXEL32));
+
+      Pixel.Blue = 0xaf;
+
+      memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * (5 + step)) + i, &Pixel, sizeof(PIXEL32));
+    }
+  }
+
+  // Draw Square
+
+  int32_t ScreenX = 25;
+
+  int32_t ScreenY = 25;
+
+  int32_t StartingScreenPixel = ((GAME_RES_WIDTH * GAME_RES_HEIGHT) - GAME_RES_WIDTH) - \
+    (GAME_RES_WIDTH * ScreenY) + ScreenX;
+
+  for(int32_t y = 0; y < 16; y++)
+  {
+    for (int32_t x = 0; x < 16; x++)
+    {
+      memset((PIXEL32*)gBackBuffer.Memory + StartingScreenPixel + x - (GAME_RES_WIDTH * y), 0xFF, sizeof(PIXEL32));
+    }
   }
 
   HDC DeviceContext = GetDC(gGameWindow);
@@ -480,6 +498,8 @@ static void RenderFrameGraphics(void)
     SelectObject(DeviceContext, (HFONT)GetStockObject(ANSI_FIXED_FONT));
 
     SetBkMode(DeviceContext, TRANSPARENT);
+
+    SetTextColor(DeviceContext, 0x00FFFFFF);
 
     TextOutA(DeviceContext, 0, 0, DebugTextBuffer, (int)strlen(DebugTextBuffer));
 
