@@ -6,17 +6,22 @@
 
 #include <stdlib.h>
 
-#define WIN32_LEAN_AND_MEAN 
-#pragma warning(push, 3)
-#include <windows.h>
-#pragma warning(pop)
+//#define WIN32_LEAN_AND_MEAN 
+//#pragma warning(push, 3)
+//#include <windows.h>
+//#pragma warning(pop)
 
 #include <stdint.h>
 
 #include "main.h"
 
+#include <time.h>
 
-// TODO, do we need all these globals?
+
+// TODO, do we need all these globals here?
+
+_NtQueryTimerResolution NtQueryTimerResolution = NULL;
+
 
 HWND gGameWindow;
 
@@ -39,9 +44,99 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
 
   DWORD Result = ERROR_SUCCESS;
 
+  // The time in microseconds that each frame starts
+
+  int64_t FrameStart = 0;
+  
+  // The time in microseconds that each frame ends. 
+  // This variable is reused to measure both "raw" and "cooked" frame times.
+  
+  int64_t FrameEnd = 0;
+  
+  // The elapsed time in microseconds that each frame ends. 
+  // This variable is reused to measure both "raw" and "cooked" frame times.
+
+  int64_t ElapsedMicroseconds = 0;
+
+  // We accumulate the amount of time taken to render a "raw" frame and then
+  // calculate the average every x frames, i.e., we divide it by x number of frames rendered.
+
+  int64_t ElapsedMicrosecondsAccumulatorRaw = 0;
+
+  // We accumulate the amount of time taken to render a "cooked" frame and then
+  // calculate the average every x frames, i.e., we divide it by x number of frames rendered.
+  // This should hopefully be a steady 60fps. A "cooked" frame is a frame after we have 
+  // waited/slept for a calculated amount of time before starting the next frame.
+
+  int64_t ElapsedMicrosecondsAccumulatorCooked = 0;
+
+
   if (GameIsAlreadyRunning())
   {
     MessageBoxA(NULL, "Another instance of this application is already running!", "Error!", MB_ICONEXCLAMATION | MB_OK);
+
+    goto Exit;
+  }
+
+  // We need the undocumented Windows API function NtQueryTimerResolution to get the resolution of the global system timer.
+  // A higher resolution timer will show a lower number, because if your clock can tick every e.g. 0.5ms, that is a higher 
+  // resolution than a timer that can only tick every 1.0ms.
+  
+  // VS2022 seems to require a strip of type (FARPROC) with a cast to (void*) first, then desired function type, 
+  // in this case (_NtQueryTimerResolution)
+  
+  if ((NtQueryTimerResolution = (_NtQueryTimerResolution)(void*) GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQueryTimerResolution")) == NULL)
+  {
+    MessageBoxA(NULL, "Couldn't find the NtQueryTimerResolution function in ntdll.dll!", "Error!", MB_ICONERROR | MB_OK);
+
+    goto Exit;
+  }
+
+  NtQueryTimerResolution(
+    (PULONG) &gPerformanceData.MinimumTimerResolution, 
+    (PULONG) &gPerformanceData.MaximumTimerResolution, 
+    (PULONG) &gPerformanceData.CurrentTimerResolution);
+
+  SYSTEM_INFO SystemInfo;
+
+  GetSystemInfo(&SystemInfo);
+
+  // Initialize the variable that is used to calculate average CPU usage of this process.
+
+  int64_t PreviousSystemTime = 0;
+
+  GetSystemTimeAsFileTime((FILETIME*)&PreviousSystemTime);
+
+  // The timeBeginPeriod function controls a global system-wide timer. So
+  // increasing the clock resolution here will affect all processes running on this
+  // entire system. It will increase context switching, the rate at which timers
+  // fire across the entire system, etc. Due to this, Microsoft generally discourages 
+  // the use of timeBeginPeriod completely. However, we need it, because without 
+  // 1ms timer resolution, we simply cannot maintain a reliable 60 frames per second.
+  // Also, we don't need to worry about calling timeEndPeriod, because Windows will
+  // automatically cancel our requested timer resolution once this process exits.
+
+  if (timeBeginPeriod(1) == TIMERR_NOCANDO)
+  {
+    MessageBoxA(NULL, "Failed to set global timer resolution!", "Error!", MB_ICONERROR | MB_OK);
+
+    goto Exit;
+  }
+
+  // Increase process and thread priority to minimize the chances of another thread on the system
+  // preempting us when we need to run and causing a stutter in our frame rate. (Though it can still happen.)
+  // Windows is not a real-time OS and you cannot guarantee timings or deadlines, but you can get close.  
+  
+  if (SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS) == 0)
+  {
+    MessageBoxA(NULL, "Failed to set process priority!", "Error!", MB_ICONERROR | MB_OK);
+
+    goto Exit;
+  }
+
+  if (SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST) == 0)
+  {
+    MessageBoxA(NULL, "Failed to set thread priority!", "Error!", MB_ICONERROR | MB_OK);
 
     goto Exit;
   }
@@ -51,10 +146,11 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
     goto Exit;
   }
 
-  QueryPerformanceFrequency(&gPerformanceData.PerfFrequency);
+  int64_t PerfFrequency = 0;
 
+  QueryPerformanceFrequency((LARGE_INTEGER*) &PerfFrequency);
   
-  gBackBuffer.BitmapInfo.bmiHeader.biSize = sizeof(gBackBuffer);
+  gBackBuffer.BitmapInfo.bmiHeader.biSize = sizeof(gBackBuffer.BitmapInfo.bmiHeader);
 
   gBackBuffer.BitmapInfo.bmiHeader.biWidth = GAME_RES_WIDTH;
 
@@ -65,6 +161,9 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
   gBackBuffer.BitmapInfo.bmiHeader.biCompression = BI_RGB;
 
   gBackBuffer.BitmapInfo.bmiHeader.biPlanes = 1;
+
+  // NOTE: Corressponding VirtualFree(...) not required due to this memory being required 
+  // for the lifetime of the process.  Once we exit, windows will clean it up automatically.
 
   gBackBuffer.Memory = VirtualAlloc(NULL, GAME_DRAWING_AREA_MEMORY_SIZE, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
   
@@ -79,12 +178,19 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
 
   MSG Message = { 0 };
 
+
+  // This is the main game loop. Setting gGameIsRunning to FALSE at any point will cause
+  // the game to exit immediately. The loop has two important functions: ProcessPlayerInput
+  // and RenderFrameGraphics. The loop will execute these two duties as quickly as possible,
+  // but will then sleep for a few milliseconds using a precise timing mechanism in order 
+  // to achieve a smooth 60 frames per second. We also calculate some performance statistics
+  // every 2 seconds or 120 frames.    
+
   gGameIsRunning = TRUE;
 
   while (TRUE == gGameIsRunning)
   {
-
-    QueryPerformanceCounter(&gPerformanceData.FrameStart);
+    QueryPerformanceCounter((LARGE_INTEGER*) &FrameStart);
 
     while (PeekMessageA(&Message, gGameWindow, 0, 0, PM_REMOVE))
     {
@@ -95,25 +201,61 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
 
     RenderFrameGraphics();
 
-    QueryPerformanceCounter(&gPerformanceData.FrameEnd);
+    QueryPerformanceCounter((LARGE_INTEGER*) &FrameEnd);
 
-    gPerformanceData.ElapsedMicroSecondsPerFrame.QuadPart = gPerformanceData.FrameEnd.QuadPart - gPerformanceData.FrameStart.QuadPart;
+    ElapsedMicroseconds = FrameEnd - FrameStart;
 
-    gPerformanceData.ElapsedMicroSecondsPerFrame.QuadPart *= 1000000;
+    ElapsedMicroseconds *= 1000000;
 
-    gPerformanceData.ElapsedMicroSecondsPerFrame.QuadPart /= gPerformanceData.PerfFrequency.QuadPart;
-
-    Sleep(1);  // TODO do i need this?
+    ElapsedMicroseconds /= PerfFrequency;
 
     gPerformanceData.TotalFramesRendered++;
 
-    if (gPerformanceData.TotalFramesRendered % CALCULATE_AVG_FPS_EVERY_X_FRAMES == 0)
-    {
-      char str[64] = { 0 };
+    ElapsedMicrosecondsAccumulatorRaw += ElapsedMicroseconds;
 
-      _snprintf_s(str, _countof(str), _TRUNCATE, "Elapsed microseconds: %lli\n", gPerformanceData.ElapsedMicroSecondsPerFrame.QuadPart);
+    while (ElapsedMicroseconds < TARGET_MICROSECONDS_PER_FRAME)
+    {
+      ElapsedMicroseconds = FrameEnd - FrameStart;
+
+      ElapsedMicroseconds *= 1000000;
+
+      ElapsedMicroseconds /= PerfFrequency;
+
+      QueryPerformanceCounter((LARGE_INTEGER*) &FrameEnd);
+
+      // If we are less than 75% of the way through the current frame, then rest.
+      // Sleep(1) is only anywhere near 1 millisecond if we have previously set the global
+      // system timer resolution to 1ms or below using timeBeginPeriod.
+
+      if (ElapsedMicroseconds < (TARGET_MICROSECONDS_PER_FRAME * 0.75f))
+      {
+        Sleep(1);
+      }
+    }
+
+    ElapsedMicrosecondsAccumulatorCooked += ElapsedMicroseconds;
+
+    if ((gPerformanceData.TotalFramesRendered % CALCULATE_STATS_EVERY_X_FRAMES) == 0) 
+    {
+      //int64_t AverageMicroSecondsPerFrameRaw = ElapsedMicrosecondsAccumulatorRaw / CALCULATE_STATS_EVERY_X_FRAMES;
+
+      //int64_t AverageMicroSecondsPerFrameCooked = ElapsedMicrosecondsAccumulatorCooked / CALCULATE_STATS_EVERY_X_FRAMES;
+
+      gPerformanceData.RawFPSAverage = 1.0f / (((float)ElapsedMicrosecondsAccumulatorRaw / CALCULATE_STATS_EVERY_X_FRAMES) * 0.000001f);
+
+      gPerformanceData.CookedFPSAverage = 1.0f / (((float)ElapsedMicrosecondsAccumulatorCooked / CALCULATE_STATS_EVERY_X_FRAMES) * 0.000001f);
+
+      char str[256] = { 0 };
+
+      _snprintf_s(str, _countof(str), _TRUNCATE,
+        "Avg FPS Cooked: %.01f\tAvg FPS Raw: %.01f\n",
+        gPerformanceData.CookedFPSAverage, gPerformanceData.RawFPSAverage);
       
       OutputDebugStringA(str);
+
+      ElapsedMicrosecondsAccumulatorRaw = 0;
+
+      ElapsedMicrosecondsAccumulatorCooked = 0;
     }
   }
 

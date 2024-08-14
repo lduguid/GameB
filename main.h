@@ -1,5 +1,24 @@
 #pragma once
 
+//#define WIN32_LEAN_AND_MEAN 
+#pragma warning(push, 3)
+// '_WIN32_WINNT_WIN10_TH2' is not defined as a preprocessor macro, replacing with '0' for '#if/#elif
+#pragma warning(disable: 4668)  
+
+#include <windows.h>
+#pragma warning(pop)
+
+// Process Status API, e.g. GetProcessMemoryInfo
+#include <psapi.h>
+
+// Windows Multimedia library, we use it for timeBeginPeriod 
+// to adjust the global system timer resolution.
+#pragma comment(lib, "Winmm.lib")
+
+// Imported from Ntdll.dll, this is for using the undocumented Windows API 
+// function NtQueryTimerResolution.
+typedef LONG(NTAPI* _NtQueryTimerResolution) (OUT PULONG MinimumResolution, OUT PULONG MaximumResolution, OUT PULONG CurrentResolution);
+
 
 #define GAME_NAME "Game_B"
 
@@ -9,9 +28,19 @@
 
 #define GAME_BPP         32
 
-#define GAME_DRAWING_AREA_MEMORY_SIZE (GAME_RES_WIDTH * GAME_RES_HEIGHT * (GAME_BPP / 8))   // 8 bits for red, 8 bits for green, 8 bits for blue, and 8 bits for alpha. 32 bits per pixel == 4 bytes per pixel.
+// 8 bits for red, 8 bits for green, 8 bits for blue, and 8 bits for alpha. 32 bits per pixel == 4 bytes per pixel.
 
-#define CALCULATE_AVG_FPS_EVERY_X_FRAMES  100
+#define GAME_DRAWING_AREA_MEMORY_SIZE (GAME_RES_WIDTH * GAME_RES_HEIGHT * (GAME_BPP / 8))   
+
+// Every 120 frames/2 seconds we will calculate some statistics such as average FPS, CPU usage, etc.
+
+#define CALCULATE_STATS_EVERY_X_FRAMES		120
+
+// 16.67 milliseconds is 60 frames per second.
+
+#define TARGET_MICROSECONDS_PER_FRAME		16667ULL
+
+#define TARGET_NANOSECONDS_PER_FRAME        (TARGET_MICROSECONDS_PER_FRAME * 1000)
 
 
 #pragma warning(push)
@@ -42,17 +71,15 @@ typedef struct GAMEPERFDATA
 {
   uint64_t TotalFramesRendered;
 
-  uint32_t RawFramesPerSecondAverage;
+  float RawFPSAverage;
 
-  uint64_t CookedFramesPerSecondAverage;
+  float CookedFPSAverage;
 
-  LARGE_INTEGER PerfFrequency;
+  uint32_t MinimumTimerResolution;
 
-  LARGE_INTEGER FrameStart;
+  uint32_t MaximumTimerResolution;
 
-  LARGE_INTEGER FrameEnd;
-
-  LARGE_INTEGER ElapsedMicroSecondsPerFrame;
+  uint32_t CurrentTimerResolution;
 
   MONITORINFO MonitorInfo;  // TODO init. somewhere ! = { sizeof(MONITORINFO) };
 
