@@ -1,10 +1,8 @@
 #pragma once
 
-//#define WIN32_LEAN_AND_MEAN 
 #pragma warning(push, 3)
 // '_WIN32_WINNT_WIN10_TH2' is not defined as a preprocessor macro, replacing with '0' for '#if/#elif
 #pragma warning(disable: 4668)  
-
 #include <windows.h>
 #pragma warning(pop)
 
@@ -15,8 +13,8 @@
 // to adjust the global system timer resolution.
 #pragma comment(lib, "Winmm.lib")
 
-// Imported from Ntdll.dll, this is for using the undocumented Windows API 
-// function NtQueryTimerResolution.
+
+// Imported from Ntdll.dll, this is for using the undocumented Windows API function NtQueryTimerResolution.
 typedef LONG(NTAPI* _NtQueryTimerResolution) (OUT PULONG MinimumResolution, OUT PULONG MaximumResolution, OUT PULONG CurrentResolution);
 
 
@@ -44,13 +42,11 @@ typedef LONG(NTAPI* _NtQueryTimerResolution) (OUT PULONG MinimumResolution, OUT 
 
 
 #pragma warning(push)
-#pragma warning(disable: 4820)  // see padding NOTE below
+#pragma warning(disable: 4820)  // 4-byte padding added automatically by the compiler but give warning.
 typedef struct GAMEBITMAP
 {
   BITMAPINFO BitmapInfo;  // 44 bytes
   
-  //uint32_t pad;  // NOTE: explicit 4-bytes padding or else compiler does it which generates a warning
-
   void* Memory;           // 8 bytes (64-bit)
 } GAMEBITMAP;             // 52 bytes total
 
@@ -86,6 +82,8 @@ typedef struct GAMEPERFDATA
   int32_t MonitorWidth;
 
   int32_t MonitorHeight;
+
+  BOOL DisplayDebugInfo;
 
 } GAMEPERFDATA;
 #pragma warning(pop)

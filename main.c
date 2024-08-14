@@ -7,11 +7,6 @@
 #include <stdint.h>
 #include <time.h>
 
-//#define WIN32_LEAN_AND_MEAN 
-//#pragma warning(push, 3)
-//#include <windows.h>
-//#pragma warning(pop)
-
 #include "main.h"
 
 
@@ -78,13 +73,14 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
   // A higher resolution timer will show a lower number, because if your clock can tick every e.g. 0.5ms, that is a higher 
   // resolution than a timer that can only tick every 1.0ms.
   
-  // VS2022 seems to require a strip of type (FARPROC) with a cast to (void*) first, then desired function type, 
-  // in this case (_NtQueryTimerResolution)
-  
   HMODULE NtDLLModule = GetModuleHandleA("ntdll.dll");
 
   if (NtDLLModule != 0)
   {
+
+    // VS2022 seems to require a strip of type (FARPROC) with a cast to (void*) first, then desired function type, 
+    // in this case (_NtQueryTimerResolution)
+
     if ((NtQueryTimerResolution = (_NtQueryTimerResolution)(void*)GetProcAddress(NtDLLModule, "NtQueryTimerResolution")) == NULL)
     {
       MessageBoxA(NULL, "Couldn't find the NtQueryTimerResolution function in ntdll.dll!", "Error!", MB_ICONERROR | MB_OK);
@@ -185,7 +181,6 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
 
   MSG Message = { 0 };
 
-
   // This is the main game loop. Setting gGameIsRunning to FALSE at any point will cause
   // the game to exit immediately. The loop has two important functions: ProcessPlayerInput
   // and RenderFrameGraphics. The loop will execute these two duties as quickly as possible,
@@ -244,21 +239,9 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
 
     if ((gPerformanceData.TotalFramesRendered % CALCULATE_STATS_EVERY_X_FRAMES) == 0) 
     {
-      //int64_t AverageMicroSecondsPerFrameRaw = ElapsedMicrosecondsAccumulatorRaw / CALCULATE_STATS_EVERY_X_FRAMES;
-
-      //int64_t AverageMicroSecondsPerFrameCooked = ElapsedMicrosecondsAccumulatorCooked / CALCULATE_STATS_EVERY_X_FRAMES;
-
       gPerformanceData.RawFPSAverage = 1.0f / (((float)ElapsedMicrosecondsAccumulatorRaw / CALCULATE_STATS_EVERY_X_FRAMES) * 0.000001f);
 
       gPerformanceData.CookedFPSAverage = 1.0f / (((float)ElapsedMicrosecondsAccumulatorCooked / CALCULATE_STATS_EVERY_X_FRAMES) * 0.000001f);
-
-      char str[256] = { 0 };
-
-      _snprintf_s(str, _countof(str), _TRUNCATE,
-        "Avg FPS Cooked: %.01f\tAvg FPS Raw: %.01f\n",
-        gPerformanceData.CookedFPSAverage, gPerformanceData.RawFPSAverage);
-      
-      OutputDebugStringA(str);
 
       ElapsedMicrosecondsAccumulatorRaw = 0;
 
@@ -416,17 +399,27 @@ static void ProcessPlayerInput(void)
 {
   int16_t EscapeKeyIsDown = GetAsyncKeyState(VK_ESCAPE);
 
+  int16_t DebugKeyIsDown = GetAsyncKeyState(VK_F1);
+
+  static int16_t DebugKeyWasDown;
+
   if (EscapeKeyIsDown)
   {
     SendMessageA(gGameWindow, WM_CLOSE, 0, 0);
   }
+
+  if (DebugKeyIsDown && !DebugKeyWasDown)
+  {
+    gPerformanceData.DisplayDebugInfo = !gPerformanceData.DisplayDebugInfo;
+  }
+
+  DebugKeyWasDown = DebugKeyIsDown;
 }
 
 #pragma warning(push)
 #pragma warning( disable : 5045)  // QSpectre crap.
 static void RenderFrameGraphics(void)
 {
-
   //memset(gBackBuffer.Memory, 0xff, GAME_RES_WIDTH);  // 1 pixel bottom left corner.
 
   PIXEL32 Pixel = { 0 };
@@ -476,6 +469,24 @@ static void RenderFrameGraphics(void)
     0, 0, GAME_RES_WIDTH, GAME_RES_HEIGHT, 
     gBackBuffer.Memory, &gBackBuffer.BitmapInfo, 
     DIB_RGB_COLORS, SRCCOPY);
+
+  if (gPerformanceData.DisplayDebugInfo == TRUE)
+  {
+    // TODO flickers
+    char DebugTextBuffer[64] = { 0 };
+
+    sprintf_s(DebugTextBuffer, _countof(DebugTextBuffer), "FPS Raw:    %.01f", gPerformanceData.RawFPSAverage);
+
+    SelectObject(DeviceContext, (HFONT)GetStockObject(ANSI_FIXED_FONT));
+
+    SetBkMode(DeviceContext, TRANSPARENT);
+
+    TextOutA(DeviceContext, 0, 0, DebugTextBuffer, (int)strlen(DebugTextBuffer));
+
+    sprintf_s(DebugTextBuffer, _countof(DebugTextBuffer), "FPS Cooked: %.01f", gPerformanceData.CookedFPSAverage);
+
+    TextOutA(DeviceContext, 0, 13, DebugTextBuffer, (int)strlen(DebugTextBuffer));
+  }
 
   ReleaseDC(gGameWindow, DeviceContext);
 }
