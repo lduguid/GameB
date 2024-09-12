@@ -26,7 +26,8 @@ typedef LONG(NTAPI* _NtQueryTimerResolution) (OUT PULONG MinimumResolution, OUT 
 
 #define GAME_BPP         32
 
-// 8 bits for red, 8 bits for green, 8 bits for blue, and 8 bits for alpha. 32 bits per pixel == 4 bytes per pixel.
+// 8 bits for red, 8 bits for green, 8 bits for blue, and 8 bits for alpha. 
+// 32 bits per pixel == 4 bytes per pixel.
 
 #define GAME_DRAWING_AREA_MEMORY_SIZE (GAME_RES_WIDTH * GAME_RES_HEIGHT * (GAME_BPP / 8))   
 
@@ -36,9 +37,9 @@ typedef LONG(NTAPI* _NtQueryTimerResolution) (OUT PULONG MinimumResolution, OUT 
 
 // 16.67 milliseconds is 60 frames per second.
 
-#define TARGET_MICROSECONDS_PER_FRAME		16667ULL
+#define TARGET_MICROSECONDS_PER_FRAME		  16667ULL
 
-#define TARGET_NANOSECONDS_PER_FRAME        (TARGET_MICROSECONDS_PER_FRAME * 1000)
+#define TARGET_NANOSECONDS_PER_FRAME      (TARGET_MICROSECONDS_PER_FRAME * 1000)
 
 
 #pragma warning(push)
@@ -99,4 +100,4 @@ static BOOL GameIsAlreadyRunning(void);
 
 static void ProcessPlayerInput(void);
 
-static void RenderFrameGraphics(void);
+static void RenderFrameGraphics(int32_t ScreenX, int32_t ScreenY);

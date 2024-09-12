@@ -14,13 +14,13 @@
 
 _NtQueryTimerResolution NtQueryTimerResolution = NULL;
 
-HWND gGameWindow;
+HWND gGameWindow = NULL;
 
-BOOL gGameIsRunning;
+BOOL gGameIsRunning = TRUE;
 
-GAMEBITMAP gBackBuffer;
+GAMEBITMAP gBackBuffer = { 0 };
 
-GAMEPERFDATA gPerformanceData;
+GAMEPERFDATA gPerformanceData = { 0 };
 
 
 int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In_ LPSTR CmdLine, _In_ int CmdShow)
@@ -152,6 +152,8 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
   int64_t PerfFrequency = 0;
 
   QueryPerformanceFrequency((LARGE_INTEGER*) &PerfFrequency);
+
+  gPerformanceData.DisplayDebugInfo = TRUE;
   
   gBackBuffer.BitmapInfo.bmiHeader.biSize = sizeof(gBackBuffer.BitmapInfo.bmiHeader);
 
@@ -188,7 +190,11 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
   // to achieve a smooth 60 frames per second. We also calculate some performance statistics
   // every 2 seconds or 120 frames.    
 
-  gGameIsRunning = TRUE;
+  int32_t ScreenX = 60;
+
+  int32_t ScreenY = 0;
+
+  int32_t DirectionStepY = 2; // Positive is down the screen, -'ve is up.
 
   while (TRUE == gGameIsRunning)
   {
@@ -201,7 +207,16 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
 
     ProcessPlayerInput();
 
-    RenderFrameGraphics();
+    RenderFrameGraphics(ScreenX, ScreenY);
+
+    // move block
+
+    if (ScreenY >= 220)
+      DirectionStepY = -2;
+    else if (ScreenY <= 0)
+      DirectionStepY = 2;
+
+    ScreenY += DirectionStepY;
 
     QueryPerformanceCounter((LARGE_INTEGER*) &FrameEnd);
 
@@ -416,8 +431,10 @@ static void ProcessPlayerInput(void)
 
 #pragma warning(push)
 #pragma warning( disable : 5045)        // QSpectre crap.
-static void RenderFrameGraphics(void)
+static void RenderFrameGraphics(int32_t ScreenX, int32_t ScreenY)
 {
+  // NOTE: For now, very simple background buffer coloring and object movement.
+  
   // Draw Pretty Background
 
   PIXEL32 Pixel = { 0 };
@@ -465,9 +482,9 @@ static void RenderFrameGraphics(void)
 
   // Draw Square
 
-  int32_t ScreenX = 25;
+  //int32_t ScreenX = 25;
 
-  int32_t ScreenY = 25;
+  //int32_t ScreenY = 25;
 
   int32_t StartingScreenPixel = ((GAME_RES_WIDTH * GAME_RES_HEIGHT) - GAME_RES_WIDTH) - \
     (GAME_RES_WIDTH * ScreenY) + ScreenX;
@@ -477,6 +494,11 @@ static void RenderFrameGraphics(void)
     for (int32_t x = 0; x < 16; x++)
     {
       memset((PIXEL32*)gBackBuffer.Memory + StartingScreenPixel + x - (GAME_RES_WIDTH * y), 0xFF, sizeof(PIXEL32));
+
+      int32_t SStartingScreenPixel = ((GAME_RES_WIDTH * GAME_RES_HEIGHT) - GAME_RES_WIDTH) - \
+          (GAME_RES_WIDTH * ScreenY) + (ScreenX  + 60);
+
+      memset((PIXEL32*)gBackBuffer.Memory + SStartingScreenPixel + x - (GAME_RES_WIDTH * y), 0xE0, sizeof(PIXEL32));
     }
   }
 
@@ -490,7 +512,8 @@ static void RenderFrameGraphics(void)
 
   if (gPerformanceData.DisplayDebugInfo == TRUE)
   {
-    // TODO flickers
+    // TODO flickers, for now use transparent text background.
+
     char DebugTextBuffer[64] = { 0 };
 
     sprintf_s(DebugTextBuffer, _countof(DebugTextBuffer), "FPS Raw:    %.01f", gPerformanceData.RawFPSAverage);
