@@ -16,7 +16,7 @@
 
 // Imported from Ntdll.dll, this is for using the undocumented Windows API function NtQueryTimerResolution.
 typedef LONG(NTAPI* _NtQueryTimerResolution) (OUT PULONG MinimumResolution, OUT PULONG MaximumResolution, OUT PULONG CurrentResolution);
-
+ // test change
 
 #define GAME_NAME "Game_B"
 

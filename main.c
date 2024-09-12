@@ -155,6 +155,8 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
 
   gPerformanceData.DisplayDebugInfo = TRUE;
   
+  // test change
+
   gBackBuffer.BitmapInfo.bmiHeader.biSize = sizeof(gBackBuffer.BitmapInfo.bmiHeader);
 
   gBackBuffer.BitmapInfo.bmiHeader.biWidth = GAME_RES_WIDTH;
