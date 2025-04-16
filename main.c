@@ -169,7 +169,7 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
 
   gBackBuffer.BitmapInfo.bmiHeader.biPlanes = 1;
 
-  // NOTE: Corressponding VirtualFree(...) not required due to this memory being required 
+  // NOTE: Corresponding VirtualFree(...) not required due to this memory being required 
   // for the lifetime of the process.  Once we exit, windows will clean it up automatically.
 
   gBackBuffer.Memory = VirtualAlloc(NULL, GAME_DRAWING_AREA_MEMORY_SIZE, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
@@ -432,7 +432,7 @@ static void ProcessPlayerInput(void)
 }
 
 #pragma warning(push)
-#pragma warning( disable : 5045)        // QSpectre crap.
+#pragma warning( disable : 5045)        // Qspectre crap.
 static void RenderFrameGraphics(int32_t ScreenX, int32_t ScreenY)
 {
   // NOTE: For now, very simple background buffer coloring and object movement.
@@ -451,34 +451,22 @@ static void RenderFrameGraphics(int32_t ScreenX, int32_t ScreenY)
 
   for (int step = 0; step < 48; step += 6)
   {
+
     for (int i = 0; i < (GAME_RES_WIDTH * 5); i++)
     {
-      Pixel.Blue = 0xff;
+      uint8_t PixelBlueColors[] = { 0xff, 0xef, 0xdf, 0xcf, 0xbf, 0xaf };
+      //Pixel.Blue = 0xff;
+      
+      for (int ii = 0; ii <= 5; ii++)
+      {
+        //Pixel.Blue -= 0x10;
+        Pixel.Blue = PixelBlueColors[ii];
 
-      // NOTE: No compiler warning about memcpy_s Vs. memcpy. general consensus is that
-      // memcpy_s no safer then memcpy.
+        // NOTE: No compiler warning about memcpy_s Vs. memcpy. general consensus is that
+        // memcpy_s no safer then memcpy.
 
-      memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * step) + i , &Pixel, sizeof(PIXEL32));
-
-      Pixel.Blue = 0xef;
-
-      memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * (1 + step)) + i, &Pixel, sizeof(PIXEL32));
-
-      Pixel.Blue = 0xdf;
-
-      memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * (2 + step)) + i, &Pixel, sizeof(PIXEL32));
-
-      Pixel.Blue = 0xcf;
-
-      memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * (3 + step)) + i, &Pixel, sizeof(PIXEL32));
-
-      Pixel.Blue = 0xbf;
-
-      memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * (4 + step)) + i, &Pixel, sizeof(PIXEL32));
-
-      Pixel.Blue = 0xaf;
-
-      memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * (5 + step)) + i, &Pixel, sizeof(PIXEL32));
+        memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * (ii + step)) + i, &Pixel, sizeof(PIXEL32));
+      }
     }
   }
 
@@ -488,8 +476,7 @@ static void RenderFrameGraphics(int32_t ScreenX, int32_t ScreenY)
 
   //int32_t ScreenY = 25;
 
-  int32_t StartingScreenPixel = ((GAME_RES_WIDTH * GAME_RES_HEIGHT) - GAME_RES_WIDTH) - \
-    (GAME_RES_WIDTH * ScreenY) + ScreenX;
+  int32_t StartingScreenPixel = ((GAME_RES_WIDTH * GAME_RES_HEIGHT) - GAME_RES_WIDTH) - (GAME_RES_WIDTH * ScreenY) + ScreenX;
 
   for(int32_t y = 0; y < 16; y++)
   {
