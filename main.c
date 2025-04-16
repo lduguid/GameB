@@ -155,8 +155,6 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
 
   gPerformanceData.DisplayDebugInfo = TRUE;
   
-  // test change
-
   gBackBuffer.BitmapInfo.bmiHeader.biSize = sizeof(gBackBuffer.BitmapInfo.bmiHeader);
 
   gBackBuffer.BitmapInfo.bmiHeader.biWidth = GAME_RES_WIDTH;
@@ -213,9 +211,9 @@ int WINAPI WinMain(_In_ HINSTANCE Instance, _In_opt_ HINSTANCE PrevInstance, _In
 
     // move block
 
-    if (ScreenY >= 220)
+    if (ScreenY >= 220) 
       DirectionStepY = -2;
-    else if (ScreenY <= 0)
+    else if (ScreenY <= 0) 
       DirectionStepY = 2;
 
     ScreenY += DirectionStepY;
@@ -439,15 +437,7 @@ static void RenderFrameGraphics(int32_t ScreenX, int32_t ScreenY)
   
   // Draw Pretty Background
 
-  PIXEL32 Pixel = { 0 };
-
-  Pixel.Blue = 0xff;
-  
-  Pixel.Green = 0;
-  
-  Pixel.Red = 0;
-  
-  Pixel.Alpha = 0xff;
+  PIXEL32 Pixel = { .Blue=0xff, .Green=0x00, .Red=0x00, .Alpha=0xff };
 
   for (int step = 0; step < 48; step += 6)
   {
@@ -455,15 +445,12 @@ static void RenderFrameGraphics(int32_t ScreenX, int32_t ScreenY)
     for (int i = 0; i < (GAME_RES_WIDTH * 5); i++)
     {
       uint8_t PixelBlueColors[] = { 0xff, 0xef, 0xdf, 0xcf, 0xbf, 0xaf };
-      //Pixel.Blue = 0xff;
       
       for (int ii = 0; ii <= 5; ii++)
       {
-        //Pixel.Blue -= 0x10;
         Pixel.Blue = PixelBlueColors[ii];
 
-        // NOTE: No compiler warning about memcpy_s Vs. memcpy. general consensus is that
-        // memcpy_s no safer then memcpy.
+        // NOTE: No compiler warning about memcpy_s Vs. memcpy. general consensus is that memcpy_s no safer then memcpy.
 
         memcpy((PIXEL32*)(gBackBuffer.Memory) + (GAME_RES_WIDTH * 5 * (ii + step)) + i, &Pixel, sizeof(PIXEL32));
       }
@@ -471,10 +458,6 @@ static void RenderFrameGraphics(int32_t ScreenX, int32_t ScreenY)
   }
 
   // Draw Square
-
-  //int32_t ScreenX = 25;
-
-  //int32_t ScreenY = 25;
 
   int32_t StartingScreenPixel = ((GAME_RES_WIDTH * GAME_RES_HEIGHT) - GAME_RES_WIDTH) - (GAME_RES_WIDTH * ScreenY) + ScreenX;
 
@@ -484,8 +467,7 @@ static void RenderFrameGraphics(int32_t ScreenX, int32_t ScreenY)
     {
       memset((PIXEL32*)gBackBuffer.Memory + StartingScreenPixel + x - (GAME_RES_WIDTH * y), 0xFF, sizeof(PIXEL32));
 
-      int32_t SStartingScreenPixel = ((GAME_RES_WIDTH * GAME_RES_HEIGHT) - GAME_RES_WIDTH) - \
-          (GAME_RES_WIDTH * ScreenY) + (ScreenX  + 60);
+      int32_t SStartingScreenPixel = ((GAME_RES_WIDTH * GAME_RES_HEIGHT) - GAME_RES_WIDTH) - (GAME_RES_WIDTH * ScreenY) + (ScreenX  + 60);
 
       memset((PIXEL32*)gBackBuffer.Memory + SStartingScreenPixel + x - (GAME_RES_WIDTH * y), 0xE0, sizeof(PIXEL32));
     }
